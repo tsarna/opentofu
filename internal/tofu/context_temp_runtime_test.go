@@ -150,6 +150,7 @@ var (
 	ExperimentalFeatureProviderFunctions = ExperimentalFlag{"Missing Provider Defined Functions", true}
 	ExperimentalFeatureProviderInput     = ExperimentalFlag{"Missing Provider Input Prompting", false}
 	ExperimentalFeatureModuleEnabled     = ExperimentalFlag{"Missing Module Lifecycle Enabled", false}
+	ExperimentalFeatureSymbolsFunctions  = ExperimentalFlag{"Missing Symbols Functions", false}
 
 	// Obsolete flags indicate a test which depends on a feature we do not
 	// intend to carry forward into the new engine

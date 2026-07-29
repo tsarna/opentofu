@@ -928,6 +928,13 @@ func TestScopeEvalSelfBlock(t *testing.T) {
 				"num":  cty.NullVal(cty.Number),
 			},
 		},
+		{
+			Config: `num = symbols::mylib::double(2.0)`,
+			Want: map[string]cty.Value{
+				"attr": cty.NullVal(cty.String),
+				"num":  cty.NumberIntVal(4),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -944,8 +951,9 @@ func TestScopeEvalSelfBlock(t *testing.T) {
 			body := file.Body
 
 			scope := &Scope{
-				Data:     data,
-				ParseRef: addrs.ParseRef,
+				Data:             data,
+				ParseRef:         addrs.ParseRef,
+				SymbolsFunctions: symbolFuncs,
 			}
 
 			gotVal, ctxDiags := scope.EvalSelfBlock(t.Context(), body, test.Self, schema, test.KeyData)
@@ -988,13 +996,19 @@ func Test_enhanceFunctionDiags(t *testing.T) {
 			"Invalid prefix",
 			"attr = magic::missing_function(54)",
 			"Unknown function namespace",
-			"Function \"magic::missing_function\" does not exist within a valid namespace (provider,core)",
+			"Function \"magic::missing_function\" does not exist within a valid namespace (provider,core,symbols)",
 		},
 		{
 			"Too many namespaces",
 			"attr = provider::foo::bar::extra::extra2::missing_function(54)",
 			"Invalid function format",
 			"invalid provider function \"provider::foo::bar::extra::extra2::missing_function\": expected provider::<name>::<function> or provider::<name>::<alias>::<function>",
+		},
+		{
+			"Unknown symbols function",
+			"attr = symbols::mylib::missing_function(54)",
+			"Call to unknown symbols function",
+			"There is no symbols function named \"symbols::mylib::missing_function\".",
 		},
 	}
 

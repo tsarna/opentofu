@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/opentofu/opentofu/internal/plans/objchange"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
 
 	"github.com/opentofu/opentofu/internal/addrs"
 	"github.com/opentofu/opentofu/internal/configs"
@@ -82,7 +83,7 @@ type Evaluator struct {
 // If the "self" argument is nil then the "self" object is not available
 // in evaluated expressions. Otherwise, it behaves as an alias for the given
 // address.
-func (e *Evaluator) Scope(data lang.Data, self addrs.Referenceable, source addrs.Referenceable, functions lang.ProviderFunction) *lang.Scope {
+func (e *Evaluator) Scope(data lang.Data, self addrs.Referenceable, source addrs.Referenceable, symbolFunctions map[string]function.Function, functions lang.ProviderFunction) *lang.Scope {
 	return &lang.Scope{
 		Data:              data,
 		ParseRef:          addrs.ParseRef,
@@ -92,6 +93,7 @@ func (e *Evaluator) Scope(data lang.Data, self addrs.Referenceable, source addrs
 		BaseDir:           ".", // Always current working directory for now.
 		PlanTimestamp:     e.PlanTimestamp,
 		ProviderFunctions: functions,
+		SymbolsFunctions:  symbolFunctions,
 	}
 }
 

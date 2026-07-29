@@ -9728,3 +9728,62 @@ resource "test_resource" "example" {
 		t.Fatalf("expected to have exactly one resource change but got %d", changes)
 	}
 }
+
+// Confirm symbols are not inherited from parent modules. Per the symbols RFC,
+// visibility is per-module.
+func TestContext2Plan_symbolsFunctionNotInherited(t *testing.T) {
+	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
+
+	m := testModuleInline(t, map[string]string{
+		"child/main.tf": `
+symbols "childlib" {
+  source = "./childlib"
+}
+
+output "child" {
+  value = symbols::childlib::greet("xyz")
+}
+
+output "root_from_child" {
+  value = symbols::rootlib::greet("xyz")
+}`,
+		"child/childlib/childlib.cty": `
+func greet(who: string) -> string {
+    return "hello ${who}"
+}`,
+
+		"main.tf": `
+module "child" {
+  source = "./child"
+}
+
+symbols "rootlib" {
+  source = "./rootlib"
+}
+
+output "root" {
+  value = symbols::rootlib::greet("abc")
+}
+
+output "child_from_root" {
+  value = symbols::childlib::greet("abc")
+}
+`,
+		"rootlib/rootlib.cty": `
+func greet(who: string) -> string {
+    return "howdy ${who}"
+}`,
+	})
+
+	ctx := testContext2(t, &ContextOpts{})
+	_, diags := ctx.Plan(context.Background(), m, states.NewState(), DefaultPlanOpts)
+	if !diags.HasErrors() {
+		t.Fatal("succeeded; want errors")
+	}
+	if got, want := diags.Err().Error(), "Call to unknown symbols function: There is no symbols function named \"symbols::rootlib::greet\""; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+	if got, want := diags.Err().Error(), "Call to unknown symbols function: There is no symbols function named \"symbols::childlib::greet\""; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+}

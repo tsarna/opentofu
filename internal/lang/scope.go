@@ -74,6 +74,7 @@ type Scope struct {
 	PlanTimestamp time.Time
 
 	ProviderFunctions ProviderFunction
+	SymbolsFunctions  map[string]function.Function
 }
 
 type ProviderFunction func(context.Context, addrs.ProviderFunction, tfdiags.SourceRange) (*function.Function, tfdiags.Diagnostics)

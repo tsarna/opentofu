@@ -33,7 +33,7 @@ func TestEvaluatorGetTerraformAttr(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	t.Run("terraform.workspace", func(t *testing.T) {
 		want := cty.StringVal("foo")
@@ -96,7 +96,7 @@ func TestEvaluatorGetPathAttr(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	t.Run("module", func(t *testing.T) {
 		want := cty.StringVal("bar/baz")
@@ -172,7 +172,7 @@ func TestEvaluatorGetOutputValue(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	want := cty.StringVal("first").Mark(marks.Sensitive)
 	got, diags := scope.Data.GetOutput(t.Context(), addrs.OutputValue{
@@ -271,7 +271,7 @@ func TestEvaluatorGetInputVariable(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	{ // variable configured as sensitive but value not marked before
 		want := cty.StringVal("bar").Mark(marks.Sensitive)
@@ -452,7 +452,7 @@ func TestEvaluatorGetResource(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	want := cty.ObjectVal(map[string]cty.Value{
 		"id": cty.StringVal("foo"),
@@ -619,7 +619,7 @@ func TestEvaluatorGetResource_changes(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	want := cty.ObjectVal(map[string]cty.Value{
 		"id":              cty.StringVal("foo"),
@@ -831,7 +831,7 @@ func TestEvaluatorGetResource_Ephemeral(t *testing.T) {
 			data := &evaluationStateData{
 				Evaluator: evaluator,
 			}
-			scope := evaluator.Scope(data, nil, nil, nil)
+			scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 			got, diags := scope.Data.GetResource(t.Context(), rc.Addr(), tfdiags.SourceRange{})
 
@@ -866,7 +866,7 @@ func TestEvaluatorGetModule(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 	want := cty.ObjectVal(map[string]cty.Value{
 		"out":  cty.StringVal("bar").Mark(marks.Sensitive),
 		"out2": cty.StringVal("baz").Mark(marks.Ephemeral),
@@ -905,7 +905,7 @@ func TestEvaluatorGetModule(t *testing.T) {
 	data = &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope = evaluator.Scope(data, nil, nil, nil)
+	scope = evaluator.Scope(data, nil, nil, nil, nil)
 	want = cty.ObjectVal(map[string]cty.Value{
 		"out":  cty.StringVal("baz").Mark(marks.Sensitive),
 		"out2": cty.StringVal("bazz").Mark(marks.Ephemeral),
@@ -926,7 +926,7 @@ func TestEvaluatorGetModule(t *testing.T) {
 	data = &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope = evaluator.Scope(data, nil, nil, nil)
+	scope = evaluator.Scope(data, nil, nil, nil, nil)
 	want = cty.ObjectVal(map[string]cty.Value{
 		"out":  cty.StringVal("baz").Mark(marks.Sensitive),
 		"out2": cty.StringVal("bazz").Mark(marks.Ephemeral),
@@ -1014,7 +1014,7 @@ func TestEvaluatorGetModule_ForEach(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	got, diags := scope.Data.GetModule(t.Context(), addrs.ModuleCall{
 		Name: "mods",
@@ -1092,7 +1092,7 @@ func TestEvaluatorGetModule_ForEachWithoutOutputs(t *testing.T) {
 	data := &evaluationStateData{
 		Evaluator: evaluator,
 	}
-	scope := evaluator.Scope(data, nil, nil, nil)
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
 
 	got, diags := scope.Data.GetModule(t.Context(), addrs.ModuleCall{
 		Name: "empty",

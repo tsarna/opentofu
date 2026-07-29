@@ -3281,3 +3281,50 @@ resource "test_instance" "a" {
 		})
 	}
 }
+
+func TestContext2Validate_symbolsFunctions(t *testing.T) {
+	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
+
+	m := testModuleInline(t, map[string]string{
+		"child/main.tf": `
+symbols "mylib" {
+  source = "./mylib"
+}
+
+output "out" {
+  value = symbols::mylib::greet("xyz")
+}`,
+		"child/mylib/mylib.cty": `
+func greet(who: string) -> string {
+    return "hello ${who}"
+}`,
+		"main.tf": `
+module "child" {
+  source = "./child"
+}
+
+symbols "mylib" {
+  source = "./mylib"
+}
+
+output "root" {
+  value = symbols::mylib::greet("abc")
+}
+
+output "child" {
+  value = module.child.out
+}
+`,
+		"mylib/mylib.cty": `
+func greet(who: string) -> string {
+    return "howdy ${who}"
+}`,
+	})
+
+	ctx := testContext2(t, &ContextOpts{})
+
+	diags := ctx.Validate(context.Background(), m)
+	if diags.HasErrors() {
+		t.Fatalf("validate: %s", diags.Err())
+	}
+}

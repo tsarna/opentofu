@@ -61,6 +61,12 @@ func (s *Scope) Functions() map[string]function.Function {
 		for _, name := range coreNames {
 			s.funcs[addrs.ParseFunction(name).FullyQualified().String()] = s.funcs[name]
 		}
+
+		// Merge in the symbol library's functions. Symbol library functions are
+		// prefixed with symbols:: so can never overwrite anything above.
+		for name, f := range s.SymbolsFunctions {
+			s.funcs[name] = f
+		}
 	}
 	s.funcsLock.Unlock()
 

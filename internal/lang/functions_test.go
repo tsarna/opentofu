@@ -7,6 +7,7 @@ package lang
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,9 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/opentofu/opentofu/internal/addrs"
+	"github.com/stretchr/testify/assert"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
 
 	"github.com/opentofu/opentofu/internal/experiments"
 	"github.com/opentofu/opentofu/internal/lang/marks"
@@ -1360,6 +1363,142 @@ func TestFunctionsPrefixedCorrectly(t *testing.T) {
 			t.Errorf("expected %q function to be in the scope", want)
 		}
 	}
+}
+
+func TestSymbolsFunctions(t *testing.T) {
+	tests := map[string][]struct {
+		src         string
+		want        cty.Value
+		summary     string
+		detail      string
+		symbolFuncs map[string]function.Function
+	}{
+		// Functions merged from symbols libraries work
+		"symbols::mylib::double": {
+			{
+				`symbols::mylib::double(2)`,
+				cty.NumberIntVal(4),
+				"", "",
+				symbolFuncs,
+			},
+			{
+				`symbols::mylib::double(2)`,
+				cty.DynamicVal,
+				"Call to unknown symbols function",
+				"There is no symbols function named \"symbols::mylib::double\".",
+				nil,
+			},
+		},
+		// Base functions also still work, with and without core:: namespace,
+		// and still works when no symbols functions are present
+		"upper": {
+			{
+				`upper("a")`,
+				cty.StringVal("A"),
+				"", "",
+				symbolFuncs,
+			},
+			{
+				`core::upper("a")`,
+				cty.StringVal("A"),
+				"", "",
+				symbolFuncs,
+			},
+			{
+				`upper("a")`,
+				cty.StringVal("A"),
+				"", "", nil,
+			},
+			{
+				`core::upper("a")`,
+				cty.StringVal("A"),
+				"", "", nil,
+			},
+		},
+		"symbols::mylib::missing": {
+			{
+				`symbols::mylib::missing(42)`,
+				cty.DynamicVal,
+				"Call to unknown symbols function",
+				"There is no symbols function named \"symbols::mylib::missing\".",
+				symbolFuncs,
+			},
+			{
+				`symbols::mylib::missing(42)`,
+				cty.DynamicVal,
+				"Call to unknown symbols function",
+				"There is no symbols function named \"symbols::mylib::missing\".",
+				nil,
+			},
+		},
+	}
+
+	for funcName, funcTests := range tests {
+		t.Run(funcName, func(t *testing.T) {
+			for _, test := range funcTests {
+
+				data := &dataForTests{} // no variables available; we only need literals here
+
+				for _, pureOnly := range []bool{false, true} {
+					scope := &Scope{
+						Data:             data,
+						BaseDir:          "./testdata/functions-test", // for the functions that read from the filesystem
+						PlanTimestamp:    time.Date(2004, 04, 25, 15, 00, 00, 000, time.UTC),
+						SymbolsFunctions: test.symbolFuncs,
+						PureOnly:         pureOnly,
+					}
+
+					expr, parseDiags := hclsyntax.ParseExpression([]byte(test.src), "test.hcl", hcl.Pos{Line: 1, Column: 1})
+					if parseDiags.HasErrors() {
+						for _, diag := range parseDiags {
+							t.Error(diag.Error())
+						}
+						return
+					}
+
+					got, diags := scope.EvalExpr(t.Context(), expr, cty.DynamicPseudoType)
+					if diags.HasErrors() {
+						if test.summary != "" {
+							assert.Equal(t, test.summary, diags[0].Description().Summary, "wrong error summary")
+							assert.Equal(t, test.detail, diags[0].Description().Detail, "wrong error detail")
+						} else {
+							for _, diag := range diags {
+								t.Errorf("with pureOnly %t: %s: %s", pureOnly, diag.Description().Summary, diag.Description().Detail)
+							}
+							return
+						}
+					} else {
+						assert.Equal(t, "", test.summary, "expected an error")
+					}
+
+					if !test.want.RawEquals(got) {
+						t.Errorf("wrong result with pureOnly %t\nexpr: %s\ngot:  %#v\nwant: %#v", pureOnly, test.src, got, test.want)
+					}
+				}
+			}
+		})
+	}
+}
+
+var doubleFunc function.Function = function.New(&function.Spec{
+	Description: "return the input number multipled by 2",
+	Params: []function.Parameter{
+		{
+			Name:        "n",
+			Description: "the number to be doubled",
+			Type:        cty.Number,
+		},
+	},
+	Type: function.StaticReturnType(cty.Number),
+	Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
+		v := args[0].AsBigFloat()
+		v = v.Mul(v, big.NewFloat(2))
+		return cty.NumberVal(v), nil
+	},
+})
+
+var symbolFuncs map[string]function.Function = map[string]function.Function{
+	"symbols::mylib::double": doubleFunc,
 }
 
 const (

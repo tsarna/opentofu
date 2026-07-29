@@ -320,11 +320,16 @@ func (c *BuiltinEvalContext) EvaluationScope(self addrs.Referenceable, source ad
 	// real situations.
 	mc := c.Evaluator.Config.DescendentForInstance(c.PathValue)
 
-	if mc == nil || mc.Module.ProviderRequirements == nil {
-		return c.Evaluator.Scope(data, self, source, nil)
+	var symbolsFunctions map[string]function.Function
+	if mc != nil && mc.Module != nil && mc.Module.SymbolLibrary != nil {
+		symbolsFunctions = mc.Module.SymbolLibrary.Functions
 	}
 
-	scope := c.Evaluator.Scope(data, self, source, func(ctx context.Context, pf addrs.ProviderFunction, rng tfdiags.SourceRange) (*function.Function, tfdiags.Diagnostics) {
+	if mc == nil || mc.Module.ProviderRequirements == nil {
+		return c.Evaluator.Scope(data, self, source, symbolsFunctions, nil)
+	}
+
+	scope := c.Evaluator.Scope(data, self, source, symbolsFunctions, func(ctx context.Context, pf addrs.ProviderFunction, rng tfdiags.SourceRange) (*function.Function, tfdiags.Diagnostics) {
 		providedBy, ok := c.ProviderFunctionTracker.Lookup(c.PathValue.Module(), pf)
 		if !ok {
 			// This should not be possible if references are tracked correctly

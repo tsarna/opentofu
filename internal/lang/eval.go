@@ -162,6 +162,7 @@ func (s *Scope) EvalSelfBlock(ctx context.Context, body hcl.Body, self cty.Value
 	hclCtx := &hcl.EvalContext{
 		Variables: vals,
 		// TODO consider if any provider functions make sense here
+		// Symbol library functions are available
 		Functions: s.Functions(),
 	}
 
@@ -259,6 +260,9 @@ func enhanceFunctionDiag(diag *hcl.Diagnostic, funcExtra hclsyntax.FunctionCallU
 			enhanced.Summary = "Invalid function format"
 			enhanced.Detail = err.Error()
 		}
+	} else if fn.IsNamespace(addrs.FunctionNamespaceSymbols) {
+		enhanced.Summary = "Call to unknown symbols function"
+		enhanced.Detail = fmt.Sprintf("There is no symbols function named %q.", fn.String())
 	} else {
 		enhanced.Summary = "Unknown function namespace"
 		enhanced.Detail = fmt.Sprintf("Function %q does not exist within a valid namespace (%s)", fn, strings.Join(addrs.FunctionNamespaces, ","))

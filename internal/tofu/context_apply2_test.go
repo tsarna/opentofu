@@ -7353,3 +7353,141 @@ func TestContext2Apply_ephemeralInModuleWithExpansion(t *testing.T) {
 
 	}
 }
+
+func TestContext2Apply_SymbolsFunctions(t *testing.T) {
+	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
+
+	m := testModuleInline(t, map[string]string{
+		`main.tf`: `
+            symbols "mylib" {
+              source = "./mylib"
+            }
+
+            output "doubled" {
+              value = symbols::mylib::double(21)
+            }
+
+            output "upper" {
+               value = symbols::mylib::upper_case_wrapper("hello")
+            }
+
+            resource "test_object" "a" {
+              test_string = symbols::mylib::upper_case_wrapper("world")
+              count = symbols::mylib::double(1)
+            }`,
+
+		`mylib/mylib.cty`: `
+            func double(n: number) -> number {
+                return n * 2
+            }
+
+            // ensure standard library is available
+            func upper_case_wrapper(s: string) -> string {
+                return upper(s)
+            }`,
+	})
+
+	state := states.NewState()
+
+	p := simpleMockProvider()
+
+	ctx := testContext2(t, &ContextOpts{
+		Plugins: plugins.NewLibrary(map[addrs.Provider]providers.Factory{
+			addrs.NewDefaultProvider("test"): testProviderFuncFixed(p),
+		}, nil),
+	})
+
+	plan, diags := ctx.Plan(context.Background(), m, state, &PlanOpts{})
+	if diags.HasErrors() {
+		t.Fatalf("plan: %s", diags.Err())
+	}
+	state, diags = ctx.Apply(context.Background(), plan, m, nil)
+	if diags.HasErrors() {
+		t.Fatalf("apply: %s", diags.Err())
+	}
+
+	outputs := state.Module(addrs.RootModuleInstance).OutputValues
+	if v := outputs["doubled"].Value; v.Equals(cty.NumberIntVal(42)).False() {
+		t.Fatalf("incorrect 'doubled' output value: %#v\n", v)
+	}
+	if v := outputs["upper"].Value; v.AsString() != "HELLO" {
+		t.Fatalf("incorrect 'upper' output value: %#v\n", v)
+	}
+
+	for i := 0; i < 2; i++ {
+		addr := fmt.Sprintf("test_object.a[%d]", i)
+		obj := state.ResourceInstance(mustResourceInstanceAddr(addr))
+		if obj == nil {
+			t.Fatalf("resource not found: %#q\n", addr)
+		}
+		v := string(obj.Current.AttrsJSON)
+		if !strings.Contains(v, "\"test_string\":\"WORLD\"") {
+			t.Fatalf("incorrect resource attribute: %#v\n", v)
+		}
+	}
+
+	obj := state.ResourceInstance(mustResourceInstanceAddr("test_object.a[2]"))
+	if obj != nil {
+		t.Fatal("test_object.a[2] should not exist")
+	}
+}
+
+func TestContext2Apply_symbolsFunctionIsolation(t *testing.T) {
+	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
+
+	m := testModuleInline(t, map[string]string{
+		"child/main.tf": `
+symbols "mylib" {
+  source = "./mylib"
+}
+
+output "out" {
+  value = symbols::mylib::greet("xyz")
+}`,
+		"child/mylib/mylib.cty": `
+func greet(who: string) -> string {
+    return "hello ${who}"
+}`,
+		"main.tf": `
+module "child" {
+  source = "./child"
+}
+
+symbols "mylib" {
+  source = "./mylib"
+}
+
+output "root" {
+  value = symbols::mylib::greet("abc")
+}
+
+output "child" {
+  value = module.child.out
+}
+`,
+		"mylib/mylib.cty": `
+func greet(who: string) -> string {
+    return "howdy ${who}"
+}`,
+	})
+
+	ctx := testContext2(t, &ContextOpts{})
+
+	plan, diags := ctx.Plan(context.Background(), m, states.NewState(), DefaultPlanOpts)
+	if diags.HasErrors() {
+		t.Fatalf("plan: %s", diags.Err())
+	}
+
+	state, diags := ctx.Apply(context.Background(), plan, m, nil)
+	if diags.HasErrors() {
+		t.Fatalf("apply: %s", diags.Err())
+	}
+
+	outputs := state.Module(addrs.RootModuleInstance).OutputValues
+	if v := outputs["root"].Value; v.AsString() != "howdy abc" {
+		t.Fatalf("incorrect 'root' output value: %#v\n", v)
+	}
+	if v := outputs["child"].Value; v.AsString() != "hello xyz" {
+		t.Fatalf("incorrect 'child' output value: %#v\n", v)
+	}
+}
