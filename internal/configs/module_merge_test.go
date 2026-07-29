@@ -86,6 +86,87 @@ func TestModuleOverrideVariable(t *testing.T) {
 	assertResultDeepEqual(t, got, want)
 }
 
+func TestModuleOverrideSymbols(t *testing.T) {
+	mod, diags := testModuleFromDir("testdata/valid-modules/override-symbols")
+	assertNoDiagnostics(t, diags)
+	if mod == nil {
+		t.Fatalf("module is nil")
+	}
+
+	got := mod.SymbolsBlocks
+	want := map[string]*Symbols{
+		"fully_overridden": {
+			Label:         "fully_overridden",
+			SourceAddrRaw: "./fooa",
+			SourceAddr:    addrs.ModuleSourceLocal("./fooa"),
+			SourceAddrRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/a_override.tf"),
+				Start:    hcl.Pos{Line: 2, Column: 12, Byte: 40},
+				End:      hcl.Pos{Line: 2, Column: 20, Byte: 48},
+			},
+			Namespace:    "",
+			NamespaceSet: true,
+			DeclRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/primary.tf"),
+				Start:    hcl.Pos{Line: 1, Column: 1, Byte: 0},
+				End:      hcl.Pos{Line: 1, Column: 27, Byte: 26},
+			},
+		},
+		"partially_overridden": {
+			Label:         "partially_overridden",
+			SourceAddrRaw: "./quxa",
+			SourceAddr:    addrs.ModuleSourceLocal("./quxa"),
+			SourceAddrRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/a_override.tf"),
+				Start:    hcl.Pos{Line: 6, Column: 12, Byte: 96},
+				End:      hcl.Pos{Line: 6, Column: 20, Byte: 104},
+			},
+			Namespace:    "",
+			NamespaceSet: false,
+			DeclRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/primary.tf"),
+				Start:    hcl.Pos{Line: 6, Column: 1, Byte: 71},
+				End:      hcl.Pos{Line: 6, Column: 31, Byte: 101},
+			},
+		},
+		"introduce_ns": {
+			Label:         "introduce_ns",
+			SourceAddrRaw: "./xyz",
+			SourceAddr:    addrs.ModuleSourceLocal("./xyz"),
+			SourceAddrRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/primary.tf"),
+				Start:    hcl.Pos{Line: 11, Column: 12, Byte: 162},
+				End:      hcl.Pos{Line: 11, Column: 19, Byte: 169},
+			},
+			Namespace:    "baz::qux",
+			NamespaceSet: true,
+			DeclRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/primary.tf"),
+				Start:    hcl.Pos{Line: 10, Column: 1, Byte: 126},
+				End:      hcl.Pos{Line: 10, Column: 23, Byte: 148},
+			},
+		},
+		"ns_not_clobbered": {
+			Label:         "ns_not_clobbered",
+			SourceAddrRaw: "./sa",
+			SourceAddr:    addrs.ModuleSourceLocal("./sa"),
+			SourceAddrRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/a_override.tf"),
+				Start:    hcl.Pos{Line: 10, Column: 12, Byte: 148},
+				End:      hcl.Pos{Line: 10, Column: 18, Byte: 154},
+			},
+			Namespace:    "ns",
+			NamespaceSet: true,
+			DeclRange: hcl.Range{
+				Filename: filepath.FromSlash("testdata/valid-modules/override-symbols/primary.tf"),
+				Start:    hcl.Pos{Line: 14, Column: 1, Byte: 173},
+				End:      hcl.Pos{Line: 14, Column: 27, Byte: 199},
+			},
+		},
+	}
+	assertResultDeepEqual(t, got, want)
+}
+
 func TestModuleOverrideOutput(t *testing.T) {
 	mod, diags := testModuleFromDir("testdata/valid-modules/override-output")
 	assertNoDiagnostics(t, diags)

@@ -45,6 +45,14 @@ type Module struct {
 
 	ModuleCalls map[string]*ModuleCall
 
+	// Individual Symbols blocks
+	SymbolsBlocks map[string]*Symbols
+
+	// The SymbolLibrary is the result of parsing and compiling all the Symbols
+	// blocks in this module. nil means no symbols blocks, or loading failed.
+	// Populated by the parser-level load pass.
+	SymbolLibrary *SymbolLibrary
+
 	ManagedResources   map[string]*Resource
 	DataResources      map[string]*Resource
 	EphemeralResources map[string]*Resource
@@ -95,6 +103,7 @@ type File struct {
 	ProviderMetas     []*ProviderMeta
 	RequiredProviders []*RequiredProviders
 	Encryptions       []*config.EncryptionConfig
+	SymbolsBlocks     []*Symbols
 
 	Variables []*Variable
 	Locals    []*Local
@@ -174,6 +183,7 @@ func NewModuleUneval(primaryFiles, overrideFiles []*File, sourceDir string, load
 		Locals:             map[string]*Local{},
 		Outputs:            map[string]*Output{},
 		ModuleCalls:        map[string]*ModuleCall{},
+		SymbolsBlocks:      map[string]*Symbols{},
 		ManagedResources:   map[string]*Resource{},
 		DataResources:      map[string]*Resource{},
 		EphemeralResources: map[string]*Resource{},
@@ -440,6 +450,18 @@ func (m *Module) appendFile(file *File) hcl.Diagnostics {
 			})
 		}
 		m.ModuleCalls[mc.Name] = mc
+	}
+
+	for _, s := range file.SymbolsBlocks {
+		if existing, exists := m.SymbolsBlocks[s.Label]; exists {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Duplicate symbols block",
+				Detail:   fmt.Sprintf("A symbols block named %q was already defined at %s. Symbols blocks must have unique labels.", existing.Label, existing.DeclRange),
+				Subject:  &s.DeclRange,
+			})
+		}
+		m.SymbolsBlocks[s.Label] = s
 	}
 
 	for _, r := range file.ManagedResources {
@@ -744,6 +766,21 @@ func (m *Module) mergeFile(file *File) hcl.Diagnostics {
 			continue
 		}
 		mergeDiags := existing.merge(mc)
+		diags = append(diags, mergeDiags...)
+	}
+
+	for _, s := range file.SymbolsBlocks {
+		existing, exists := m.SymbolsBlocks[s.Label]
+		if !exists {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Missing symbols block to override",
+				Detail:   fmt.Sprintf("There is no symbols block named %q. An override file can only override a symbols block that was defined in a primary configuration file.", s.Label),
+				Subject:  &s.DeclRange,
+			})
+			continue
+		}
+		mergeDiags := existing.merge(s)
 		diags = append(diags, mergeDiags...)
 	}
 

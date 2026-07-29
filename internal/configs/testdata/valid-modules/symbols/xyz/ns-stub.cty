@@ -1,0 +1,9 @@
+namespace baz::qux
+
+const xyz = "baz::qux::xyz"
+
+type stringy_thingy = string
+
+func quadruple(n : number) -> number {
+    return n * 4
+}

@@ -12,8 +12,10 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/opentofu/opentofu/internal/lang"
 	"github.com/opentofu/opentofu/internal/modsdir"
 	"github.com/spf13/afero"
+	"github.com/zclconf/go-cty/cty/function"
 
 	"github.com/opentofu/opentofu/internal/addrs"
 	"github.com/opentofu/opentofu/internal/configs"
@@ -99,6 +101,7 @@ type Config struct {
 func NewLoader(config *Config) (Loader, error) {
 	fs := afero.NewOsFs()
 	parser := configs.NewParser(fs)
+	parser.SetFunctions(SymbolsFunctions())
 
 	ret := &loader{
 		parser: parser,
@@ -115,6 +118,30 @@ func NewLoader(config *Config) (Loader, error) {
 	}
 
 	return ret, nil
+}
+
+// Build the map of OpenTofu standard functions to be available to
+// functions defined in symbols libraries.
+func SymbolsFunctions() map[string]function.Function {
+	functions := make(map[string]function.Function)
+
+	pureOnlyScope := lang.Scope{PureOnly: true}
+
+	for name, f := range pureOnlyScope.Functions() {
+		functions[name] = f
+	}
+
+	// There is no plan yet, so plantimestamp isn't meaningful
+	removeFuncs := make([]string, 0, len(lang.ImpureFunctions)+1)
+	removeFuncs = append(removeFuncs, lang.ImpureFunctions...)
+	removeFuncs = append(removeFuncs, "plantimestamp")
+
+	for _, name := range removeFuncs {
+		delete(functions, name)
+		delete(functions, "core::"+name)
+	}
+
+	return functions
 }
 
 // ModulesDir returns the path to the directory where the loader will look for

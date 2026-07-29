@@ -1,0 +1,3 @@
+symbols "dejavu" {
+    source = "./bar"
+}

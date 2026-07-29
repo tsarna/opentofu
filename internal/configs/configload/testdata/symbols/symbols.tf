@@ -1,0 +1,3 @@
+symbols "mylib" {
+    source = "./mylib"
+}

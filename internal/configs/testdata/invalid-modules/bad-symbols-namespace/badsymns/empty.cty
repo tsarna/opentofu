@@ -1,0 +1,7 @@
+namespace bad
+
+const _private = 123
+
+func _privfunc() -> null {
+    return null
+}

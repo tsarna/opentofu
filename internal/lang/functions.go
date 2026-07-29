@@ -19,7 +19,7 @@ import (
 	"github.com/opentofu/opentofu/internal/lang/funcs"
 )
 
-var impureFunctions = []string{
+var ImpureFunctions = []string{
 	"bcrypt",
 	"timestamp",
 	"uuid",
@@ -43,7 +43,7 @@ func (s *Scope) Functions() map[string]function.Function {
 		if s.PureOnly {
 			// Force our few impure functions to return unknown so that we
 			// can defer evaluating them until a later pass.
-			for _, name := range impureFunctions {
+			for _, name := range ImpureFunctions {
 				s.funcs[name] = function.Unpredictable(s.funcs[name])
 			}
 		}

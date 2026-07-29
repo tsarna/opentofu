@@ -12,6 +12,9 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/opentofu/opentofu/internal/addrs"
 	"github.com/opentofu/opentofu/internal/configs"
+	"github.com/opentofu/opentofu/internal/lang"
+	"github.com/stretchr/testify/assert"
+	"github.com/tsarna/functy"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -114,4 +117,49 @@ func TestModuleSourceAddrs(t *testing.T) {
 		})
 	}
 
+}
+
+func TestSymbolsPureFunctions(t *testing.T) {
+	funcs := SymbolsFunctions()
+
+	for _, impure := range lang.ImpureFunctions {
+		assert.NotContains(t, funcs, impure, "Impure functions should have been removed")
+		assert.NotContains(t, funcs, "core::"+impure, "Impure functions in core namespace should have been removed")
+	}
+
+	// plantimestamp doesn't make sense when a plan hasn't been generated yet
+	assert.NotContains(t, funcs, "plantimestamp", "plantimestamp should have been removed")
+	assert.NotContains(t, funcs, "core::plantimestamp", "core::plantimestamp should have been removed")
+
+	assert.Contains(t, funcs, "length", "base functions should be present")
+	assert.Contains(t, funcs, "core::length", "base functions should be present in core namespace")
+
+	for name := range functy.Stdlib() {
+		assert.NotContains(t, funcs, name, "Future-proofing: functy stdlib and OpenTofu core should not overlap")
+	}
+}
+
+// Provd that the stdlib functions have been provided to symbols functions
+// by calling a symbol library function that wraps a stdlib function.
+func TestSymbolsFunctionCall(t *testing.T) {
+	fixtureDir := filepath.Clean("testdata/symbols")
+	loader, err := NewLoader(&Config{
+		ModulesDir: filepath.Join(fixtureDir, ".terraform/modules"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error from NewLoader: %s", err)
+	}
+
+	config, diags := loader.LoadConfig(t.Context(), fixtureDir, configs.RootModuleCallForTesting())
+	assertNoDiagnostics(t, diags)
+
+	symLib := config.Module.SymbolLibrary
+	assert.NotNil(t, symLib)
+
+	assert.Contains(t, symLib.Functions, "symbols::mylib::upper_case_wrapper")
+	f := symLib.Functions["symbols::mylib::upper_case_wrapper"]
+
+	r, err := f.Call([]cty.Value{cty.StringVal("hello world")})
+	assert.NoError(t, err)
+	assert.True(t, r.Equals(cty.StringVal("HELLO WORLD")).True())
 }

@@ -1,0 +1,3 @@
+symbols "missingdir" {
+  source = "./missing"
+}

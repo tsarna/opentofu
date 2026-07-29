@@ -1,0 +1,3 @@
+const abc = "abc"
+
+type counting_thingy = number

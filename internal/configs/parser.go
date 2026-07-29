@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/spf13/afero"
+	"github.com/zclconf/go-cty/cty/function"
 )
 
 // Parser is the main interface to read configuration files and other related
@@ -20,8 +21,9 @@ import (
 // It retains a cache of all files that are loaded so that they can be used
 // to create source code snippets in diagnostics, etc.
 type Parser struct {
-	fs afero.Afero
-	p  *hclparse.Parser
+	fs        afero.Afero
+	p         *hclparse.Parser
+	functions map[string]function.Function
 }
 
 // NewParser creates and returns a new Parser that reads files from the given
@@ -36,6 +38,13 @@ func NewParser(fs afero.Fs) *Parser {
 		fs: afero.Afero{Fs: fs},
 		p:  hclparse.NewParser(),
 	}
+}
+
+// Set the functions that will be available to symbols libraries
+func (p *Parser) SetFunctions(functions map[string]function.Function) *Parser {
+	p.functions = functions
+
+	return p
 }
 
 // LoadHCLFile is a low-level method that reads the file at the given path,

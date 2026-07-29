@@ -1251,7 +1251,7 @@ func TestFunctions(t *testing.T) {
 		// TODO: we can test the impure functions partially by configuring the scope
 		// with PureOnly: true and then verify that they return unknown values of a
 		// suitable type.
-		for _, impureFunc := range impureFunctions {
+		for _, impureFunc := range ImpureFunctions {
 			funcAddr := addrs.ParseFunction(impureFunc)
 			delete(allFunctions, funcAddr.Name)
 			delete(allFunctions, funcAddr.FullyQualified().String())

@@ -187,6 +187,13 @@ func loadConfigFileBody(body hcl.Body, _ string, override bool) (*File, hcl.Diag
 				file.ModuleCalls = append(file.ModuleCalls, cfg)
 			}
 
+		case "symbols":
+			cfg, cfgDiags := decodeSymbolsBlock(block, override)
+			diags = append(diags, cfgDiags...)
+			if cfg != nil {
+				file.SymbolsBlocks = append(file.SymbolsBlocks, cfg)
+			}
+
 		case "resource":
 			cfg, cfgDiags := decodeResourceBlock(block, override)
 			diags = append(diags, cfgDiags...)
@@ -307,6 +314,10 @@ var configFileSchema = &hcl.BodySchema{
 		},
 		{
 			Type: "terraform",
+		},
+		{
+			Type:       "symbols",
+			LabelNames: []string{"name"},
 		},
 	},
 }

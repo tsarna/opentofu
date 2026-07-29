@@ -1,0 +1,7 @@
+funk broken() -> null {
+    iff wrong => 0 {
+        call(
+    } elif broken := foo {
+        asdfghjkl
+    }
+}
