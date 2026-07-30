@@ -236,6 +236,10 @@ func parseRef(traversal hcl.Traversal) (*Reference, tfdiags.Diagnostics) {
 			SourceRange: tfdiags.SourceRangeFromHCL(rootRange),
 			Remaining:   traversal[1:],
 		}, diags
+	case "symbols":
+		return parseSingleAttrRef(traversal, func(name string) Referenceable {
+			return NewSymbolsAttr(name)
+		})
 	case "terraform":
 		return parseSingleAttrRef(traversal, func(name string) Referenceable {
 			return NewTerraformAttr(IdentTerraform, name)

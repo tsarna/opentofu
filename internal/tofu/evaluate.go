@@ -1033,6 +1033,53 @@ func (d *evaluationStateData) getResourceSchema(ctx context.Context, addr addrs.
 	return schema
 }
 
+func (d *evaluationStateData) GetSymbolsAttr(_ context.Context, addr addrs.SymbolsAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+	var diags tfdiags.Diagnostics
+
+	moduleConfig := d.Evaluator.Config.DescendentForInstance(d.ModulePath)
+	if moduleConfig == nil {
+		// should never happen, since we can't be evaluating in a module
+		// that wasn't mentioned in configuration.
+		panic(fmt.Sprintf("symbols value read from %s, which has no configuration", d.ModulePath))
+	}
+
+	if moduleConfig.Module == nil || moduleConfig.Module.SymbolLibrary == nil {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  `No symbols library present`,
+			Detail:   fmt.Sprintf(`%s not present, symbols have not been configured in %s`, addr.String(), moduleDisplayAddr(d.ModulePath)),
+			Subject:  rng.ToHCL().Ptr(),
+		})
+		return cty.DynamicVal, diags
+	}
+
+	symbolsVal := moduleConfig.Module.SymbolLibrary.Values
+
+	valType := symbolsVal.Type()
+	if valType.HasAttribute(addr.Name) {
+		return symbolsVal.GetAttr(addr.Name), nil
+	} else {
+		attrs := valType.AttributeTypes()
+		keys := make([]string, 0, len(attrs))
+		for k := range attrs {
+			keys = append(keys, k)
+		}
+
+		suggestion := didyoumean.NameSuggestion(addr.Name, keys)
+		if suggestion != "" {
+			suggestion = fmt.Sprintf(" Did you mean %q?", suggestion)
+		}
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  `Invalid "symbols" attribute`,
+			Detail:   fmt.Sprintf(`The "symbols" object does not have an attribute named %q.%s`, addr.Name, suggestion),
+			Subject:  rng.ToHCL().Ptr(),
+		})
+	}
+
+	return cty.DynamicVal, diags
+}
+
 func (d *evaluationStateData) GetTerraformAttr(_ context.Context, addr addrs.TerraformAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 	switch addr.Name {

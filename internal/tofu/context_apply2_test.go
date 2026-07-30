@@ -7432,7 +7432,81 @@ func TestContext2Apply_SymbolsFunctions(t *testing.T) {
 	}
 }
 
-func TestContext2Apply_symbolsFunctionIsolation(t *testing.T) {
+func TestContext2Apply_SymbolsValues(t *testing.T) {
+	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
+
+	m := testModuleInline(t, map[string]string{
+		`main.tf`: `
+            symbols "mylib" {
+              source = "./mylib"
+            }
+
+            output "answer" {
+              value = symbols.mylib.answer
+            }
+
+            output "greeting" {
+               value = symbols.mylib.greeting
+            }
+
+            resource "test_object" "a" {
+              test_string = symbols.mylib.greeting
+              count = symbols.mylib.two
+            }`,
+
+		`mylib/mylib.cty`: `
+            const answer = 42
+            const two = 2
+            const greeting = upper("hello")
+        `,
+	})
+
+	state := states.NewState()
+
+	p := simpleMockProvider()
+
+	ctx := testContext2(t, &ContextOpts{
+		Plugins: plugins.NewLibrary(map[addrs.Provider]providers.Factory{
+			addrs.NewDefaultProvider("test"): testProviderFuncFixed(p),
+		}, nil),
+	})
+
+	plan, diags := ctx.Plan(context.Background(), m, state, &PlanOpts{})
+	if diags.HasErrors() {
+		t.Fatalf("plan: %s", diags.Err())
+	}
+	state, diags = ctx.Apply(context.Background(), plan, m, nil)
+	if diags.HasErrors() {
+		t.Fatalf("apply: %s", diags.Err())
+	}
+
+	outputs := state.Module(addrs.RootModuleInstance).OutputValues
+	if v := outputs["answer"].Value; v.Equals(cty.NumberIntVal(42)).False() {
+		t.Fatalf("incorrect 'answer' output value: %#v\n", v)
+	}
+	if v := outputs["greeting"].Value; v.AsString() != "HELLO" {
+		t.Fatalf("incorrect 'greeting' output value: %#v\n", v)
+	}
+
+	for i := 0; i < 2; i++ {
+		addr := fmt.Sprintf("test_object.a[%d]", i)
+		obj := state.ResourceInstance(mustResourceInstanceAddr(addr))
+		if obj == nil {
+			t.Fatalf("resource not found: %#q\n", addr)
+		}
+		v := string(obj.Current.AttrsJSON)
+		if !strings.Contains(v, "\"test_string\":\"HELLO\"") {
+			t.Fatalf("incorrect resource attribute: %#v\n", v)
+		}
+	}
+
+	obj := state.ResourceInstance(mustResourceInstanceAddr("test_object.a[2]"))
+	if obj != nil {
+		t.Fatal("test_object.a[2] should not exist")
+	}
+}
+
+func TestContext2Apply_symbolsIsolation(t *testing.T) {
 	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
 
 	m := testModuleInline(t, map[string]string{
@@ -7443,8 +7517,15 @@ symbols "mylib" {
 
 output "out" {
   value = symbols::mylib::greet("xyz")
-}`,
+}
+  
+output "answer" {
+  value = symbols.mylib.answer
+}
+`,
 		"child/mylib/mylib.cty": `
+const answer: number = 42
+
 func greet(who: string) -> string {
     return "hello ${who}"
 }`,
@@ -7461,11 +7542,21 @@ output "root" {
   value = symbols::mylib::greet("abc")
 }
 
+output "root_answer" {
+  value = symbols.mylib.answer
+}
+
 output "child" {
   value = module.child.out
 }
+
+output "child_answer" {
+  value = module.child.answer
+}
 `,
 		"mylib/mylib.cty": `
+const answer: number = 73
+
 func greet(who: string) -> string {
     return "howdy ${who}"
 }`,
@@ -7484,10 +7575,20 @@ func greet(who: string) -> string {
 	}
 
 	outputs := state.Module(addrs.RootModuleInstance).OutputValues
+
+	// Check function isolation
 	if v := outputs["root"].Value; v.AsString() != "howdy abc" {
 		t.Fatalf("incorrect 'root' output value: %#v\n", v)
 	}
 	if v := outputs["child"].Value; v.AsString() != "hello xyz" {
 		t.Fatalf("incorrect 'child' output value: %#v\n", v)
+	}
+
+	// Check value isolation
+	if v := outputs["root_answer"].Value; v.Equals(cty.NumberIntVal(73)).False() {
+		t.Fatalf("incorrect 'root_answer' output value: %#v\n", v)
+	}
+	if v := outputs["child_answer"].Value; v.Equals(cty.NumberIntVal(42)).False() {
+		t.Fatalf("incorrect 'child_answer' output value: %#v\n", v)
 	}
 }

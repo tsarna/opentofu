@@ -700,6 +700,62 @@ func TestParseRef(t *testing.T) {
 			``,
 		},
 
+		// symbols
+		{
+			`symbols.mylib`,
+			&Reference{
+				Subject: NewSymbolsAttr("mylib"),
+				SourceRange: tfdiags.SourceRange{
+					Start: tfdiags.SourcePos{Line: 1, Column: 1, Byte: 0},
+					End:   tfdiags.SourcePos{Line: 1, Column: 14, Byte: 13},
+				},
+			},
+			``,
+		},
+		{
+			`symbols.mylib.pi`,
+			&Reference{
+				Subject: NewSymbolsAttr("mylib"),
+				SourceRange: tfdiags.SourceRange{
+					Start: tfdiags.SourcePos{Line: 1, Column: 1, Byte: 0},
+					End:   tfdiags.SourcePos{Line: 1, Column: 14, Byte: 13},
+				},
+				Remaining: hcl.Traversal{
+					hcl.TraverseAttr{
+						Name: "pi",
+						SrcRange: hcl.Range{
+							Start: hcl.Pos{Line: 1, Column: 14, Byte: 13},
+							End:   hcl.Pos{Line: 1, Column: 17, Byte: 16},
+						},
+					},
+				},
+			},
+			``,
+		},
+		{
+			`symbols`,
+			nil,
+			`The "symbols" object cannot be accessed directly. Instead, access one of its attributes.`,
+		},
+		{
+			`symbols["foo"]`,
+			nil,
+			`The "symbols" object does not support this operation.`,
+		},
+
+		// escape hatch for accessing a resource named "symbols".
+		{
+			`resource.symbols.foo`,
+			&Reference{
+				Subject: Resource{Mode: ManagedResourceMode, Type: "symbols", Name: "foo"},
+				SourceRange: tfdiags.SourceRange{
+					Start: tfdiags.SourcePos{Line: 1, Column: 1, Byte: 0},
+					End:   tfdiags.SourcePos{Line: 1, Column: 21, Byte: 20},
+				},
+			},
+			``,
+		},
+
 		// terraform
 		{
 			`terraform.workspace`,

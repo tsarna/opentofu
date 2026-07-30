@@ -80,6 +80,10 @@ locals {
 	func = md5("my-string")
 	missing_func = missing_fn("my-string")
 	provider_func = provider::type::fn("my-string")
+	
+	# symbols
+	symbols_value = symbols.mylib.answer
+	symbols_func = symbols::mylib::fn("x")
 }
 
 resource "foo" "bar" {}
@@ -301,6 +305,16 @@ resource "foo" "bar" {}
 		assertExactDiagnostics(t, diags, []string{`eval.tf:60,17-27: Call to unknown function; There is no function named "missing_fn".`})
 		_, diags = eval.Evaluate(t.Context(), mod.Locals["provider_func"].Expr, StaticIdentifier{Subject: fmt.Sprintf("local.%s", mod.Locals["provider_func"].Name), DeclRange: mod.Locals["provider_func"].DeclRange})
 		assertExactDiagnostics(t, diags, []string{`eval.tf:61,18-36: Provider function in static context; Unable to use provider::type::fn in static context, which is required by local.provider_func`})
+		_, diags = eval.Evaluate(t.Context(), mod.Locals["symbols_func"].Expr, StaticIdentifier{Subject: fmt.Sprintf("local.%s", mod.Locals["symbols_func"].Name), DeclRange: mod.Locals["symbols_func"].DeclRange})
+		assertExactDiagnostics(t, diags, []string{`eval.tf:65,17-35: Call to unknown symbols function; There is no symbols function named "symbols::mylib::fn".`})
+	})
+
+	t.Run("Symbols", func(t *testing.T) {
+		mod, _ := NewModule([]*File{file}, nil, RootModuleCallForTesting(), "dir", SelectiveLoadAll)
+		eval := NewStaticEvaluator(mod, RootModuleCallForTesting())
+
+		_, diags := eval.Evaluate(t.Context(), mod.Locals["symbols_value"].Expr, StaticIdentifier{Subject: fmt.Sprintf("local.%s", mod.Locals["symbols_value"].Name), DeclRange: mod.Locals["symbols_value"].DeclRange})
+		assertExactDiagnostics(t, diags, []string{`eval.tf:64,18-31: Symbols in static context; Unable to use symbols.mylib in static context, which is required by local.symbols_value`})
 	})
 }
 

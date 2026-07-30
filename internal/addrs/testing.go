@@ -32,6 +32,7 @@ var CmpOptionsForTesting cmp.Options = cmp.Options{
 		ModuleCallInstance{},
 		ModuleCallInstanceOutput{},
 		PathAttr{},
+		SymbolsAttr{},
 		TerraformAttr{},
 	),
 	// HCL's "Traverser" implementations also use an unexported field to

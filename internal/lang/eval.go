@@ -119,6 +119,7 @@ func (s *Scope) EvalSelfBlock(ctx context.Context, body hcl.Body, self cty.Value
 
 	terraformAttrs := map[string]cty.Value{}
 	pathAttrs := map[string]cty.Value{}
+	symbolsAttrs := map[string]cty.Value{}
 
 	// We could always load the static values for Path and Terraform values,
 	// but we want to parse the references so that we can get source ranges for
@@ -134,6 +135,11 @@ func (s *Scope) EvalSelfBlock(ctx context.Context, body hcl.Body, self cty.Value
 			val, valDiags := normalizeRefValue(s.Data.GetPathAttr(ctx, subj, ref.SourceRange))
 			diags = diags.Append(valDiags)
 			pathAttrs[subj.Name] = val
+
+		case addrs.SymbolsAttr:
+			val, valDiags := normalizeRefValue(s.Data.GetSymbolsAttr(ctx, subj, ref.SourceRange))
+			diags = diags.Append(valDiags)
+			symbolsAttrs[subj.Name] = val
 
 		case addrs.TerraformAttr:
 			val, valDiags := normalizeRefValue(s.Data.GetTerraformAttr(ctx, subj, ref.SourceRange))
@@ -158,6 +164,11 @@ func (s *Scope) EvalSelfBlock(ctx context.Context, body hcl.Body, self cty.Value
 	vals["path"] = cty.ObjectVal(pathAttrs)
 	vals["terraform"] = cty.ObjectVal(terraformAttrs)
 	vals["tofu"] = cty.ObjectVal(terraformAttrs)
+
+	// Add only when referenced, matching the main eval context
+	if len(symbolsAttrs) != 0 {
+		vals["symbols"] = cty.ObjectVal(symbolsAttrs)
+	}
 
 	hclCtx := &hcl.EvalContext{
 		Variables: vals,
@@ -415,6 +426,7 @@ type evalVarBuilder struct {
 	localValues        map[string]cty.Value
 	outputValues       map[string]cty.Value
 	pathAttrs          map[string]cty.Value
+	symbolsAttrs       map[string]cty.Value
 	terraformAttrs     map[string]cty.Value
 	countAttrs         map[string]cty.Value
 	forEachAttrs       map[string]cty.Value
@@ -434,6 +446,7 @@ func (s *Scope) newEvalVarBuilder() *evalVarBuilder {
 		localValues:        map[string]cty.Value{},
 		outputValues:       map[string]cty.Value{},
 		pathAttrs:          map[string]cty.Value{},
+		symbolsAttrs:       map[string]cty.Value{},
 		terraformAttrs:     map[string]cty.Value{},
 		countAttrs:         map[string]cty.Value{},
 		forEachAttrs:       map[string]cty.Value{},
@@ -527,6 +540,9 @@ func (b *evalVarBuilder) putValueBySubject(ctx context.Context, ref *addrs.Refer
 	case addrs.PathAttr:
 		b.pathAttrs[subj.Name], normDiags = normalizeRefValue(b.s.Data.GetPathAttr(ctx, subj, rng))
 
+	case addrs.SymbolsAttr:
+		b.symbolsAttrs[subj.Name], normDiags = normalizeRefValue(b.s.Data.GetSymbolsAttr(ctx, subj, rng))
+
 	case addrs.TerraformAttr:
 		b.terraformAttrs[subj.Name], normDiags = normalizeRefValue(b.s.Data.GetTerraformAttr(ctx, subj, rng))
 
@@ -600,7 +616,7 @@ func (b *evalVarBuilder) buildAllVariablesInto(vals map[string]cty.Value) {
 	vals["count"] = cty.ObjectVal(b.countAttrs)
 	vals["each"] = cty.ObjectVal(b.forEachAttrs)
 
-	// Checks and outputs are conditionally included in the available scope, so
+	// Checks, outputs, and symbols are conditionally included in the available scope, so
 	// we'll only write out their values if we actually have something for them.
 	if len(b.checkBlocks) > 0 {
 		vals["check"] = cty.ObjectVal(b.checkBlocks)
@@ -608,6 +624,10 @@ func (b *evalVarBuilder) buildAllVariablesInto(vals map[string]cty.Value) {
 
 	if len(b.outputValues) > 0 {
 		vals["output"] = cty.ObjectVal(b.outputValues)
+	}
+
+	if len(b.symbolsAttrs) > 0 {
+		vals["symbols"] = cty.ObjectVal(b.symbolsAttrs)
 	}
 
 	if b.self != cty.NilVal {

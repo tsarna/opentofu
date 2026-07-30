@@ -9729,9 +9729,10 @@ resource "test_resource" "example" {
 	}
 }
 
-// Confirm symbols are not inherited from parent modules. Per the symbols RFC,
-// visibility is per-module.
-func TestContext2Plan_symbolsFunctionNotInherited(t *testing.T) {
+// Confirm symbols are not inherited between parent and child modules
+// in either direction. Per the symbols RFC, visibility is per-module.
+// Also tests handling of typos in the x and y parts of symbols.x.y references.
+func TestContext2Plan_symbolsNotInherited(t *testing.T) {
 	SkipExperimental(t, ExperimentalFeatureSymbolsFunctions)
 
 	m := testModuleInline(t, map[string]string{
@@ -9744,14 +9745,24 @@ output "child" {
   value = symbols::childlib::greet("xyz")
 }
 
+output "child_answer" {
+  value = symbols.childlib.answer
+}
+
 output "root_from_child" {
   value = symbols::rootlib::greet("xyz")
-}`,
+}
+  
+output "root_answer_from_child" {
+  value = symbols.rootlib.answer
+}
+`,
 		"child/childlib/childlib.cty": `
+const answer: number = 42
+
 func greet(who: string) -> string {
     return "hello ${who}"
 }`,
-
 		"main.tf": `
 module "child" {
   source = "./child"
@@ -9765,11 +9776,29 @@ output "root" {
   value = symbols::rootlib::greet("abc")
 }
 
+output "root_answer" {
+  value = symbols.rootlib.answer
+}
+
+output "root_typoed_attr" {
+  value = symbols.rootlib.answr
+}
+
+output "root_typoed_label" {
+  value = symbols.hootlib.answr
+}
+
 output "child_from_root" {
   value = symbols::childlib::greet("abc")
 }
+
+output "child_answer_from_root" {
+  value = symbols.childlib.answer
+}
 `,
 		"rootlib/rootlib.cty": `
+const answer:number = 73
+
 func greet(who: string) -> string {
     return "howdy ${who}"
 }`,
@@ -9784,6 +9813,18 @@ func greet(who: string) -> string {
 		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
 	}
 	if got, want := diags.Err().Error(), "Call to unknown symbols function: There is no symbols function named \"symbols::childlib::greet\""; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+	if got, want := diags.Err().Error(), "Invalid \"symbols\" attribute: The \"symbols\" object does not have an attribute named \"rootlib\"."; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+	if got, want := diags.Err().Error(), "Invalid \"symbols\" attribute: The \"symbols\" object does not have an attribute named \"childlib\"."; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+	if got, want := diags.Err().Error(), "Unsupported attribute: This object does not have an attribute named \"answr\""; !strings.Contains(got, want) {
+		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
+	}
+	if got, want := diags.Err().Error(), "Invalid \"symbols\" attribute: The \"symbols\" object does not have an attribute named \"hootlib\". Did you mean \"rootlib\"?"; !strings.Contains(got, want) {
 		t.Fatalf("wrong error:\ngot:  %s\nwant: message containing %q", got, want)
 	}
 }

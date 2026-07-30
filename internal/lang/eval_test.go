@@ -79,6 +79,11 @@ func TestScopeEvalContext(t *testing.T) {
 		PathAttrs: map[string]cty.Value{
 			"module": cty.StringVal("foo/bar"),
 		},
+		SymbolAttrs: map[string]cty.Value{
+			"mylib": cty.ObjectVal(map[string]cty.Value{
+				"greeting": cty.StringVal("Hello"),
+			}),
+		},
 		TerraformAttrs: map[string]cty.Value{
 			"workspace": cty.StringVal("default"),
 		},
@@ -347,6 +352,16 @@ func TestScopeEvalContext(t *testing.T) {
 			map[string]cty.Value{
 				"self": cty.ObjectVal(map[string]cty.Value{
 					"attr": cty.StringVal("multi1"),
+				}),
+			},
+		},
+		{
+			`symbols.mylib.greeting`,
+			map[string]cty.Value{
+				"symbols": cty.ObjectVal(map[string]cty.Value{
+					"mylib": cty.ObjectVal(map[string]cty.Value{
+						"greeting": cty.StringVal("Hello"),
+					}),
 				}),
 			},
 		},
@@ -839,6 +854,11 @@ func TestScopeEvalSelfBlock(t *testing.T) {
 			"cwd":    cty.StringVal("/home/foo/bar"),
 			"root":   cty.StringVal("/home/foo"),
 		},
+		SymbolAttrs: map[string]cty.Value{
+			"mylib": cty.ObjectVal(map[string]cty.Value{
+				"greeting": cty.StringVal("Hello"),
+			}),
+		},
 		TerraformAttrs: map[string]cty.Value{
 			"workspace": cty.StringVal("default"),
 		},
@@ -933,6 +953,13 @@ func TestScopeEvalSelfBlock(t *testing.T) {
 			Want: map[string]cty.Value{
 				"attr": cty.NullVal(cty.String),
 				"num":  cty.NumberIntVal(4),
+			},
+		},
+		{
+			Config: `attr = symbols.mylib.greeting`,
+			Want: map[string]cty.Value{
+				"attr": cty.StringVal("Hello"),
+				"num":  cty.NullVal(cty.Number),
 			},
 		},
 	}

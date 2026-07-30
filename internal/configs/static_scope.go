@@ -86,6 +86,13 @@ func (s staticScopeData) StaticValidateReferences(_ context.Context, refs []*add
 			continue
 		case addrs.PathAttr:
 			continue
+		case addrs.SymbolsAttr:
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Symbols in static context",
+				Detail:   fmt.Sprintf("Unable to use %s in static context, which is required by %s", subject.String(), top.String()),
+				Subject:  ref.SourceRange.ToHCL().Ptr(),
+			})
 		case addrs.TerraformAttr:
 			continue
 		case addrs.ModuleCallInstanceOutput:
@@ -206,6 +213,12 @@ func (s staticScopeData) GetPathAttr(_ context.Context, addr addrs.PathAttr, rng
 		})
 		return cty.DynamicVal, diags
 	}
+}
+
+// Temporary until symbols load moves earlier.
+// Don't forget the switch case in StaticValidateReferences
+func (s staticScopeData) GetSymbolsAttr(_ context.Context, addr addrs.SymbolsAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+	panic("Not Available in Static Context")
 }
 
 func (s staticScopeData) GetTerraformAttr(_ context.Context, addr addrs.TerraformAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {

@@ -36,6 +36,7 @@ type Data interface {
 	GetLocalValue(context.Context, addrs.LocalValue, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
 	GetModule(context.Context, addrs.ModuleCall, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
 	GetPathAttr(context.Context, addrs.PathAttr, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
+	GetSymbolsAttr(context.Context, addrs.SymbolsAttr, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
 	GetTerraformAttr(context.Context, addrs.TerraformAttr, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
 	GetInputVariable(context.Context, addrs.InputVariable, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)
 	GetOutput(context.Context, addrs.OutputValue, tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics)

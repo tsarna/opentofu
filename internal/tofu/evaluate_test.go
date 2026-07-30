@@ -24,6 +24,81 @@ import (
 	"github.com/opentofu/opentofu/internal/tfdiags"
 )
 
+func TestEvaluatorGetSymbolsAttr(t *testing.T) {
+	// Test handling of no symbols library present
+	evaluator := &Evaluator{
+		Meta: &ContextMeta{
+			Env: "foo",
+		},
+		Config: &configs.Config{
+			Module: &configs.Module{},
+		},
+	}
+
+	data := &evaluationStateData{
+		Evaluator: evaluator,
+	}
+
+	scope := evaluator.Scope(data, nil, nil, nil, nil)
+
+	_, diags := scope.Data.GetSymbolsAttr(t.Context(), addrs.NewSymbolsAttr("xyzzy"), tfdiags.SourceRange{})
+	assertDiagnosticsMatch(t, diags, tfdiags.Diagnostics{}.Append(
+		&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  `No symbols library present`,
+			Detail:   "symbols.xyzzy not present, symbols have not been configured in the root module",
+			Subject:  &hcl.Range{},
+		}),
+	)
+
+	evaluator = &Evaluator{
+		Meta: &ContextMeta{
+			Env: "foo",
+		},
+		Config: &configs.Config{
+			Module: &configs.Module{
+				SymbolLibrary: &configs.SymbolLibrary{
+					Values: cty.ObjectVal(map[string]cty.Value{
+						"testing": cty.ObjectVal(map[string]cty.Value{
+							"foo": cty.NumberIntVal(42),
+						}),
+					}),
+				},
+			},
+		},
+	}
+
+	data = &evaluationStateData{
+		Evaluator: evaluator,
+	}
+
+	scope = evaluator.Scope(data, nil, nil, nil, nil)
+
+	// Note typo "tetsing"
+	_, diags = scope.Data.GetSymbolsAttr(t.Context(), addrs.NewSymbolsAttr("tetsing"), tfdiags.SourceRange{})
+	assertDiagnosticsMatch(t, diags, tfdiags.Diagnostics{}.Append(
+		&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  `Invalid "symbols" attribute`,
+			Detail:   `The "symbols" object does not have an attribute named "tetsing". Did you mean "testing"?`,
+			Subject:  &hcl.Range{},
+		}),
+	)
+
+	got, diags := scope.Data.GetSymbolsAttr(t.Context(), addrs.NewSymbolsAttr("testing"), tfdiags.SourceRange{})
+	if len(diags) != 0 {
+		t.Errorf("unexpected diagnostics %s", spew.Sdump(diags))
+	}
+	want := cty.ObjectVal(map[string]cty.Value{
+		"foo": cty.NumberIntVal(42),
+	})
+
+	if got.Equals(want).False() {
+		t.Errorf("wrong result %q; want %q", got, want)
+	}
+
+}
+
 func TestEvaluatorGetTerraformAttr(t *testing.T) {
 	evaluator := &Evaluator{
 		Meta: &ContextMeta{

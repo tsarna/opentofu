@@ -22,6 +22,7 @@ type dataForTests struct {
 	OutputValues   map[string]cty.Value
 	Modules        map[string]cty.Value
 	PathAttrs      map[string]cty.Value
+	SymbolAttrs    map[string]cty.Value
 	TerraformAttrs map[string]cty.Value
 	InputVariables map[string]cty.Value
 	CheckBlocks    map[string]cty.Value
@@ -65,6 +66,10 @@ func (d *dataForTests) GetModuleInstanceOutput(_ context.Context, addr addrs.Mod
 
 func (d *dataForTests) GetPathAttr(_ context.Context, addr addrs.PathAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	return d.PathAttrs[addr.Name], nil
+}
+
+func (d *dataForTests) GetSymbolsAttr(_ context.Context, addr addrs.SymbolsAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+	return d.SymbolAttrs[addr.Name], nil
 }
 
 func (d *dataForTests) GetTerraformAttr(_ context.Context, addr addrs.TerraformAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
